@@ -1,3 +1,4 @@
+import configparser
 from imohash import hashfile
 from os import listdir, system
 from os.path import isfile, isdir, join, getsize
@@ -5,66 +6,60 @@ import ffmpeg, json, xmltodict, sqlite3, requests
 import anitopy, textdistance, sys
 from mal import AnimeSearch, Anime
 from tabulate import tabulate
-import PySimpleGUI as sg 
 
-rootpath = "E:\\Anime"
-try:
-    connect = sqlite3.connect("anicollection.db")
-except:
-    pass
-cur = connect.cursor()
+config = configparser.ConfigParser()
 
-##################################
-# Hàm khám phá tất cả media trong folder rootpath
-files = [] 
-def explore(path):
-    #Add files from this folder
-    fi =[]
-    try:
-        for f in listdir(path):
-            if isfile(join(path,f)) and ("mkv" in f[-4:].lower() or "mp4" in f[-4:].lower() ):
-                fi+=[f]
-    except:
-        print(f"Folder {path} can't explore. Please check again")
-    global files
-    for f in fi:
-        hashf = hashfile(join(path,f), hexdigest=True)
-        files = files + [ {'filename':f , 'path':path , 'hash':hashf} ]
-    #Scan subfolders
-    try:
-        fo = [f for f in listdir(path) if not isfile(join(path,f)) ]
-    except:
-        print("errorfolder")
-        fo=[]
+# ##################################
+# # Hàm khám phá tất cả media trong folder rootpath
+# files = [] 
+# def explore(path):
+#     #Add files from this folder
+#     fi =[]
+#     try:
+#         for f in listdir(path):
+#             if isfile(join(path,f)) and ("mkv" in f[-4:].lower() or "mp4" in f[-4:].lower() ):
+#                 fi+=[f]
+#     except:
+#         print(f"Folder {path} can't explore. Please check again")
+#     global files
+#     for f in fi:
+#         hashf = hashfile(join(path,f), hexdigest=True)
+#         files = files + [ {'filename':f , 'path':path , 'hash':hashf} ]
+#     #Scan subfolders
+#     try:
+#         fo = [f for f in listdir(path) if not isfile(join(path,f)) ]
+#     except:
+#         print("errorfolder")
+#         fo=[]
 
-    fo.sort()
-    for folder in fo:
-        sys.stdout.write("\rQuét folder: "+join(path,folder)+" "*(150-len(path)))
-        sys.stdout.flush()
-        explore(join(path,folder))
-    return ''
+#     fo.sort()
+#     for folder in fo:
+#         sys.stdout.write("\rQuét folder: "+join(path,folder)+" "*(150-len(path)))
+#         sys.stdout.flush()
+#         explore(join(path,folder))
+#     return ''
 
-# Hàm lấy metadata của 1 file==> Trả kết quả
-def metadata(filepath):
-    vid = ffmpeg.probe(filepath)
-    metavid = [f for f in vid['streams'] if f['codec_type'] == 'video'][0]
-    result={}
-    result["width"] = metavid["width"]
-    result["height"] = metavid["height"]
-    result["filesize"] = getsize(filepath)
-    result["duration"]=vid["format"]["duration"]
-    result["bitrate"]=vid["format"]["bit_rate"]
-    result["softsub"] = bool([f for f in vid['streams'] if f['codec_type'] == 'subtitle'])
-    return result
+# # Hàm lấy metadata của 1 file==> Trả kết quả
+# def metadata(filepath):
+#     vid = ffmpeg.probe(filepath)
+#     metavid = [f for f in vid['streams'] if f['codec_type'] == 'video'][0]
+#     result={}
+#     result["width"] = metavid["width"]
+#     result["height"] = metavid["height"]
+#     result["filesize"] = getsize(filepath)
+#     result["duration"]=vid["format"]["duration"]
+#     result["bitrate"]=vid["format"]["bit_rate"]
+#     result["softsub"] = bool([f for f in vid['streams'] if f['codec_type'] == 'subtitle'])
+#     return result
     
-# Hàm select
-def select(cur, table ,condition="1==1"):
-    a = "Select * FROM " + table + " WHERE " + condition
-    cur.execute( a )
-    columns = [col[0] for col in cur.description]
-    rows = [dict(zip(columns, row)) for row in cur.fetchall()]
-    return rows
-###############################################
+# # Hàm select
+# def select(cur, table ,condition="1==1"):
+#     a = "Select * FROM " + table + " WHERE " + condition
+#     cur.execute( a )
+#     columns = [col[0] for col in cur.description]
+#     rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+#     return rows
+# ###############################################
 
 
 
@@ -75,40 +70,13 @@ def select(cur, table ,condition="1==1"):
 #         t["release_group"] = ''
 #     print( t["filename"]+ '\t' + t["duration"]+ '\t' + sub + '\t' + str(t["width"])+ '\t' + str(t["height"]) + '\t' + str(t["filesize"])+ '\t' +  t["release_group"] )
 
-def maltoken():
-    # Check MAL token
-    try:
-        f = open("token.json", "r")
-        token = json.load(f)
-        f.close()
-    except:
-        os.system("python mal-gettoken.py")
-        maltoken()
+# def maltoken():
+#     system("python mal-gettoken.py")
+#     file =open("token.json","r")
+#     token = json.load(file)
+#     global access_token
+#     access_token = token["access_token"]
 
-    global access_token
-    access_token = token["access_token"]
-    try:
-        url = 'https://api.myanimelist.net/v2/users/@me'
-        response = requests.get(url, headers = {
-            'Authorization': f'Bearer {access_token}'
-            })
-        response.raise_for_status()
-        user = response.json()
-        response.close()
-        print(f"\n>>> Greetings {user['name']}! <<<")
-    except:
-        url = 'https://myanimelist.net/v1/oauth2/token'
-        response = requests.get(url, headers = {
-            'client_id': '01a75b8dcdd96c44b126be9fc60c89fc',
-            'grant_type': "refresh_token",
-            'refresh_token': token["refresh_token"]
-            })
-        response.raise_for_status()
-        token = response.json()
-        response.close()
-        with open('token.json', 'w') as file:
-            json.dump(token, file, indent = 4)
-        maltoken()
 
 
 #############################################################

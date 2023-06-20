@@ -1,0 +1,7 @@
+anitopy
+imohash
+ffmpeg
+xmltodict
+mal-api
+tabulate
+textdistance
